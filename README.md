@@ -1,4 +1,3 @@
-
 # Bitácora de Diseño y Desarrollo - Proyecto Final Backend Node.js
 
 Este documento registra paso a paso la arquitectura, configuración y desarrollo de la API REST para la gestión de productos utilizando Node.js, Express, Firebase/Firestore y autenticación JWT.
@@ -86,3 +85,71 @@ touch index.js .env .env.example src/app.js src/controllers/auth.controller.js s
 * **`src/controllers/`**: Recibe las peticiones HTTP (`req`), invoca a los servicios y devuelve los códigos de estado y respuestas JSON (`res`).
 * **`src/services/`**: Contiene la lógica de negocio y validaciones (`products.service.js`).
 * **`src/models/`**: Gestiona la conexión a Firebase (`firebase.js`) y las consultas directas a la colección de Firestore (`products.model.js`).
+
+
+---
+
+## Fase 3: Configuración del Servidor Base en Express
+
+Siguiendo la arquitectura modular del proyecto, se desacopló la configuración de la aplicación Express (`src/app.js`) del arranque del servidor HTTP (`index.js`), incorporando los middlewares globales y el manejo centralizado de rutas inexistentes.
+
+### 3.1 Variables de entorno (`.env` y `.env.example`)
+
+Se definieron las variables iniciales del entorno local para el puerto de escucha y la clave secreta de firma de tokens JWT:
+
+```env
+PORT=3000
+JWT_SECRET=clave_secreta_super_segura_talento_tech_2026
+```
+
+### 3.2 Configuración de Express y Middlewares Globales (`src/app.js`)
+
+Se configuró la instancia principal de Express habilitando **CORS** para peticiones de origen cruzado, **`body-parser`** para interpretar cuerpos en formato JSON, una ruta raíz (`GET /`) de verificación de estado y un middleware final que intercepta cualquier endpoint no definido devolviendo código HTTP `404`:
+
+```javascript
+import express from "express";
+import cors from "cors";
+import bodyParser from "body-parser";
+
+const app = express();
+
+app.use(cors());
+app.use(bodyParser.json());
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "API REST de Productos - Proyecto Final Talento Tech",
+    status: "OK"
+  });
+});
+
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Ruta no encontrada"
+  });
+});
+
+export default app;
+```
+
+### 3.3 Punto de entrada e inicio del servidor (`index.js`)
+
+Se importó `dotenv/config` para cargar las variables de entorno en memoria antes de levantar el servidor en el puerto asignado (`3000`):
+
+```javascript
+import "dotenv/config";
+import app from "./src/app.js";
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+});
+```
+
+### 3.4 Verificación de funcionamiento
+
+Se ejecutó el entorno de desarrollo mediante `npm run dev` y se validaron las respuestas en el navegador:
+
+* `GET http://localhost:3000/` $\rightarrow$ Estado `200 OK` con mensaje de bienvenida en formato JSON.
+* `GET http://localhost:3000/cualquier-cosa` $\rightarrow$ Estado `404 Not Found` con respuesta `{"error": "Ruta no encontrada"}`.

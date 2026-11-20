@@ -66,3 +66,16 @@ proyecto-final-backend-node/
 * **`GET /api/products/:id`** *(Pública)*: Obtiene el detalle de un producto específico por su ID.
 * **`POST /api/products/create`** *(Protegida - Requiere Bearer Token)*: Crea un nuevo producto validando `name` (string obligatorio) y `price` (número mayor a 0).
 * **`DELETE /api/products/:id`** *(Protegida - Requiere Bearer Token)*: Elimina un producto existente de la base de datos.
+
+
+## Códigos HTTP
+
+- `200` OK | `201` Created | `400` Bad Request | `401` Unauthorized | `403` Forbidden | `404` Not Found | `500` Internal Server Error.
+
+## Autor
+
+**Nelson Fernando Villalba** — [@NelFerViHM](https://github.com/NelFerViHM)
+*Proyecto Final — Curso Back End con Node.js (Talento Tech)*
+
+
+> **Documentación Técnica:** Consulte la **[Memoria Descriptiva](MEMORIA_DESCRIPTIVA.md)** y la **[Bitácora de Desarrollo](BITACORA.md)**.

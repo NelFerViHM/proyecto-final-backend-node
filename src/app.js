@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import authRouter from "./routes/auth.router.js";
+import productsRouter from "./routes/products.router.js";
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.get("/", (req, res) => {
 
 // Rutas de la API
 app.use("/api/auth", authRouter);
+app.use("/api/products", productsRouter);
 
 // Middleware para manejo de rutas desconocidas (Error 404)
 app.use((req, res) => {

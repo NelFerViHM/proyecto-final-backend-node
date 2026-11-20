@@ -1,3 +1,4 @@
+
 # Bitácora de Diseño y Desarrollo - Proyecto Final Backend Node.js
 
 Este documento registra paso a paso la arquitectura, configuración y desarrollo de la API REST para la gestión de productos utilizando Node.js, Express, Firebase/Firestore y autenticación JWT.
@@ -275,10 +276,10 @@ FIREBASE_APP_ID=tu_firebase_app_id
 
 Se creó el archivo encargado de inicializar la instancia de Firebase con las variables de entorno y exportar la referencia `db` de Cloud Firestore para su consumo en la capa de modelos:
 
+
 ```javascript
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
   authDomain: process.env.FIREBASE_AUTH_DOMAIN,
@@ -287,9 +288,95 @@ const firebaseConfig = {
   messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.FIREBASE_APP_ID
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-
 export { db };
 ```
+
+
+---
+
+## Fase 6: Módulo Completo de Productos (CRUD y Protección JWT)
+
+Se desarrollaron las cuatro capas correspondientes al dominio de productos, integrando la persistencia en **Cloud Firestore**, las validaciones de negocio y la protección de rutas críticas mediante el middleware de autenticación **JWT**.
+
+### 6.1 Capa de Modelo (`src/models/products.model.js`)
+
+Se implementaron las operaciones directas contra la colección `products` de Firestore utilizando el SDK modular de Firebase (`getDocs`, `getDoc`, `addDoc`, `deleteDoc`):
+
+```javascript
+import { db } from "./firebase.js";
+import {
+  collection,
+  getDocs,
+  getDoc,
+  addDoc,
+  deleteDoc,
+  doc
+} from "firebase/firestore";
+
+const productsCollection = collection(db, "products");
+
+export const getAllProducts = async () => {
+  const snapshot = await getDocs(productsCollection);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+};
+
+export const getProductById = async (id) => {
+  const productRef = doc(db, "products", id);
+  const snapshot = await getDoc(productRef);
+
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  return {
+    id: snapshot.id,
+    ...snapshot.data()
+  };
+};
+
+export const createProduct = async (productData) => {
+  const docRef = await addDoc(productsCollection, productData);
+  return {
+    id: docRef.id,
+    ...productData
+  };
+};
+
+export const deleteProduct = async (id) => {
+  const productRef = doc(db, "products", id);
+  const snapshot = await getDoc(productRef);
+
+  if (!snapshot.exists()) {
+    return false;
+  }
+
+  await deleteDoc(productRef);
+  return true;
+};
+```
+
+### 6.2 Capa de Servicio (`src/services/products.service.js`)
+
+Se centralizó la lógica de negocio y el saneamiento de datos (verificando presencia de nombre obligatorio y precio numérico mayor a cero) antes de delegar la persistencia al modelo.
+
+### 6.3 Capa de Controlador (`src/controllers/products.controller.js`)
+
+Se gestionaron las peticiones HTTP y los códigos de estado correspondientes (`200 OK`, `201 Created`, `400 Bad Request`, `404 Not Found` y `500 Internal Server Error`).
+
+### 6.4 Enrutamiento y Seguridad (`src/routes/products.router.js` y `src/app.js`)
+
+Se montaron los endpoints bajo el prefijo `/api/products`, dejando públicas las consultas y aplicando el middleware `auth` en las operaciones de creación y eliminación:
+
+* `GET /api/products` $\rightarrow$ Pública (lista todos los productos).
+* `GET /api/products/:id` $\rightarrow$ Pública (obtiene un producto por su ID).
+* `POST /api/products/create` $\rightarrow$ Protegida con Bearer Token (crea un nuevo producto en Firestore).
+* `DELETE /api/products/:id` $\rightarrow$ Protegida con Bearer Token (elimina un producto por su ID).
+
+### 6.5 Verificación Integral End-to-End
+
+Se validó mediante `curl` el ciclo completo del sistema: rechazo de creación sin token (`401`), generación de token válido en `/api/auth/login` (`200`), alta real en Firestore (`201`), consulta general y por ID (`200`) y baja definitiva (`200`).

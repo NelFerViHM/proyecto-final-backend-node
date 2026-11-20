@@ -249,3 +249,47 @@ Se validó el endpoint `POST http://localhost:3000/api/auth/login` mediante peti
 
 * **Credenciales válidas:** Respuesta `200 OK` devolviendo el token JWT generado.
 * **Credenciales inválidas:** Respuesta `401 Unauthorized` devolviendo `{"error": "Las credenciales no son correctas"}`.
+
+
+
+---
+
+## Fase 5: Conexión a la Base de Datos en la Nube (Firebase / Firestore)
+
+Se configuró el proyecto en Firebase Console con Cloud Firestore en modo de prueba y se estableció la conexión desde el backend mediante variables de entorno protegidas.
+
+### 5.1 Variables de entorno y plantilla (`.env` y `.env.example`)
+
+Se incorporaron las credenciales de configuración de la aplicación web de Firebase en el archivo local `.env` (excluido del repositorio mediante `.gitignore`) y se documentó su estructura en `.env.example`:
+
+```env
+FIREBASE_API_KEY=tu_firebase_api_key
+FIREBASE_AUTH_DOMAIN=tu_://firebaseapp.com
+FIREBASE_PROJECT_ID=tu_firebase_project_id
+FIREBASE_STORAGE_BUCKET=tu_proyecto.firebasestorage.app
+FIREBASE_MESSAGING_SENDER_ID=tu_messaging_sender_id
+FIREBASE_APP_ID=tu_firebase_app_id
+```
+
+### 5.2 Módulo de inicialización (`src/models/firebase.js`)
+
+Se creó el archivo encargado de inicializar la instancia de Firebase con las variables de entorno y exportar la referencia `db` de Cloud Firestore para su consumo en la capa de modelos:
+
+```javascript
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+export { db };
+```

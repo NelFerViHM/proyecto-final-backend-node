@@ -153,3 +153,99 @@ Se ejecutó el entorno de desarrollo mediante `npm run dev` y se validaron las r
 
 * `GET http://localhost:3000/` $\rightarrow$ Estado `200 OK` con mensaje de bienvenida en formato JSON.
 * `GET http://localhost:3000/cualquier-cosa` $\rightarrow$ Estado `404 Not Found` con respuesta `{"error": "Ruta no encontrada"}`.
+
+
+---
+
+## Fase 4: Módulo de Autenticación y Seguridad (JWT)
+
+Se implementó el flujo completo de autenticación demostrativa y autorización basada en **JSON Web Tokens (JWT)** para proteger las operaciones críticas de escritura de la API.
+
+### 4.1 Controlador de Autenticación (`src/controllers/auth.controller.js`)
+
+Se programó la validación de credenciales demostrativas (`user@email.com` / `strongPass123!`) y la generación de un token firmado mediante `jsonwebtoken` utilizando la clave secreta definida en `.env` con una vigencia de 1 hora:
+
+```javascript
+import jwt from "jsonwebtoken";
+
+const DEMO_USER = {
+  email: "user@email.com",
+  password: "strongPass123!"
+};
+
+export const login = (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({
+      error: "Debe proporcionar email y contraseña"
+    });
+  }
+
+  if (email !== DEMO_USER.email || password !== DEMO_USER.password) {
+    return res.status(401).json({
+      error: "Las credenciales no son correctas"
+    });
+  }
+
+  const token = jwt.sign(
+    { email: DEMO_USER.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
+
+  return res.status(200).json({ token });
+};
+```
+
+### 4.2 Enrutador de Autenticación (`src/routes/auth.router.js`)
+
+Se expuso el endpoint público `POST /login` integrado en `src/app.js` bajo el prefijo `/api/auth`:
+
+```javascript
+import { Router } from "express";
+import { login } from "../controllers/auth.controller.js";
+
+const router = Router();
+
+router.post("/login", login);
+
+export default router;
+```
+
+### 4.3 Middleware de Autorización (`src/middlewares/auth.middleware.js`)
+
+Se creó el filtro de seguridad que intercepta el encabezado `Authorization: Bearer <TOKEN>`, devolviendo estado `401` ante la ausencia de token y estado `403` si el token está adulterado o expirado:
+
+```javascript
+import jwt from "jsonwebtoken";
+
+export const auth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({
+      error: "Token no proporcionado"
+    });
+  }
+
+  const token = authHeader.split(" ");
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(403).json({
+      error: "Token inválido o expirado"
+    });
+  }
+};
+```
+
+### 4.4 Verificación del Login
+
+Se validó el endpoint `POST http://localhost:3000/api/auth/login` mediante peticiones `curl`:
+
+* **Credenciales válidas:** Respuesta `200 OK` devolviendo el token JWT generado.
+* **Credenciales inválidas:** Respuesta `401 Unauthorized` devolviendo `{"error": "Las credenciales no son correctas"}`.

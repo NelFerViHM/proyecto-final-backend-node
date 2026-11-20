@@ -1,382 +1,68 @@
 
-# Bitácora de Diseño y Desarrollo - Proyecto Final Backend Node.js
+# API REST de Gestión de Productos - Proyecto Final Backend Node.js
 
-Este documento registra paso a paso la arquitectura, configuración y desarrollo de la API REST para la gestión de productos utilizando Node.js, Express, Firebase/Firestore y autenticación JWT.
+Servidor web API RESTful desarrollado en **Node.js** y **Express.js** con arquitectura escalable por capas, persistencia en la nube mediante **Cloud Firestore (Firebase)** y autenticación/autorización segura basada en **JSON Web Tokens (JWT)**.
+
+> **Proceso del desarrollo del proyecto:** Para ver el desarrollo cronológico paso a paso del diseño, configuración y pruebas de este sistema, puede visitar la **[Bitácora de Desarrollo](BITACORA.md)**.
+> Se utilizo el material de las clases en video, apuntes en pdf y la informacion complementaria compartida en Discord.
 
 ---
 
-## Fase 1: Configuración del Entorno y Control de Versiones
+## Arquitectura del Proyecto
 
-Para evitar conflictos de sincronización con servicios en la nube (como OneDrive) debido al volumen de archivos de la carpeta `node_modules/`, se estableció un entorno de trabajo local sincronizado mediante GitHub entre dos estaciones de trabajo (PC de escritorio HP y notebook Lenovo Yoga).
-
-### 1.1 Creación del directorio local e inicialización de Node.js
-
-Se creó el directorio raíz del proyecto en el disco local y se inicializó el gestor de paquetes `npm` para generar el archivo `package.json`:
-
-```bash
-mkdir -p /c/proyecto-final-backend-node
-cd /c/proyecto-final-backend-node
-npm init -y
-```
-
-### 1.2 Seguridad y protección de archivos sensibles (`.gitignore`)
-
-Antes de realizar el primer guardado en el control de versiones, se creó el archivo `.gitignore` para excluir del repositorio público las dependencias pesadas y las variables de entorno privadas:
-
-```bash
-printf "node_modules/\n.env\n" > .gitignore
-```
-
-### 1.3 Inicialización de Git y vinculación con GitHub
-
-Se inicializó el repositorio local, se configuró la rama principal como `main` y se vinculó con el repositorio remoto público en GitHub:
-
-```bash
-git init
-git add .
-git commit -m "Inicio del Proyecto Final Backend Node.js"
-git branch -M main
-git remote add origin https://github.com
-git push -u origin main
+```text
+proyecto-final-backend-node/
+├── .env                  # Variables de entorno locales (no versionado)
+├── .env.example          # Plantilla de variables de entorno requeridas
+├── BITACORA.md           # Registro paso a paso de diseño y desarrollo
+├── index.js              # Punto de entrada y arranque del servidor HTTP
+├── package.json          # Dependencias y scripts (ES Modules)
+└── src/
+    ├── app.js            # Configuración de Express, CORS, body-parser y error 404
+    ├── controllers/      # Manejo de peticiones HTTP y códigos de estado
+    ├── middlewares/      # Verificación de Bearer Token (JWT)
+    ├── models/           # Conexión a Firebase y consultas a Firestore
+    ├── routes/           # Definición de endpoints (/api/auth y /api/products)
+    └── services/         # Lógica de negocio y validaciones de datos
 ```
 
 ---
 
----
+## Instalación y Puesta en Marcha
 
-## Fase 2: Estructura del Proyecto e Instalación de Dependencias
+1. **Clonar el repositorio:**
 
-Con el entorno versionado, se procedió a instalar únicamente las dependencias requeridas por la consigna oficial y a estructurar la aplicación bajo una arquitectura escalable por capas.
+   ```bash
+   git clone https://github.com
+   cd proyecto-final-backend-node
+   ```
+2. **Instalar dependencias:**
 
-### 2.1 Instalación de dependencias principales
+   ```bash
+   npm install
+   ```
+3. **Configurar variables de entorno:**
+   Crear un archivo `.env` en la raíz tomando como referencia `.env.example` y completar las credenciales de Firebase junto con `PORT` y `JWT_SECRET`.
+4. **Ejecutar el servidor:**
 
-Se instalaron los paquetes necesarios para el servidor web, el manejo de variables de entorno, la conexión a la base de datos en la nube y la seguridad mediante tokens:
+   ```bash
+   npm start
+   ```
 
-```bash
-npm install express firebase jsonwebtoken dotenv cors body-parser
-```
-
-### 2.2 Configuración de ES Modules y scripts en `package.json`
-
-Se habilitó el soporte nativo para importaciones modernas reemplazando `"type": "commonjs"` por `"type": "module"`, y se definieron los comandos de ejecución en modo producción y desarrollo:
-
-```json
-"type": "module",
-"scripts": {
-  "start": "node index.js",
-  "dev": "node --watch index.js"
-}
-```
-
-### 2.3 Arquitectura de directorios y división de responsabilidades
-
-Se replicó la estructura modular del proyecto separando la configuración de Express, los puntos de entrada, las rutas, los controladores, los servicios, los modelos de datos y los middlewares de seguridad:
-
-```bash
-mkdir -p src/controllers src/middlewares src/models src/routes src/services
-touch index.js .env .env.example src/app.js src/controllers/auth.controller.js src/controllers/products.controller.js src/middlewares/auth.middleware.js src/models/firebase.js src/models/products.model.js src/routes/auth.router.js src/routes/products.router.js src/services/products.service.js
-```
-
-#### Mapa de capas resultante:
-
-* **`index.js`**: Punto de entrada que carga las variables de entorno e inicia el servidor HTTP.
-* **`src/app.js`**: Instancia y configura Express, CORS, `body-parser`, las rutas y el manejo global de errores `404`.
-* **`src/routes/`**: Define los endpoints (`auth.router.js` y `products.router.js`) y asigna los middlewares correspondientes.
-* **`src/middlewares/`**: Contiene `auth.middleware.js` para validar los Bearer Tokens (JWT) en rutas protegidas.
-* **`src/controllers/`**: Recibe las peticiones HTTP (`req`), invoca a los servicios y devuelve los códigos de estado y respuestas JSON (`res`).
-* **`src/services/`**: Contiene la lógica de negocio y validaciones (`products.service.js`).
-* **`src/models/`**: Gestiona la conexión a Firebase (`firebase.js`) y las consultas directas a la colección de Firestore (`products.model.js`).
-
+   *(Para desarrollo con recarga automática: `npm run dev`)*.
 
 ---
 
-## Fase 3: Configuración del Servidor Base en Express
+## Endpoints de la API
 
-Siguiendo la arquitectura modular del proyecto, se desacopló la configuración de la aplicación Express (`src/app.js`) del arranque del servidor HTTP (`index.js`), incorporando los middlewares globales y el manejo centralizado de rutas inexistentes.
+### Autenticación (`/api/auth`)
 
-### 3.1 Variables de entorno (`.env` y `.env.example`)
+* **`POST /api/auth/login`** *(Pública)*: Valida las credenciales y devuelve un Bearer Token JWT válido por 1 hora.
+  * **Credenciales de prueba:** `email`: `"user@email.com"` | `password`: `"strongPass123!"`
 
-Se definieron las variables iniciales del entorno local para el puerto de escucha y la clave secreta de firma de tokens JWT:
+### Productos (`/api/products`)
 
-```env
-PORT=3000
-JWT_SECRET=clave_secreta_super_segura_talento_tech_2026
-```
-
-### 3.2 Configuración de Express y Middlewares Globales (`src/app.js`)
-
-Se configuró la instancia principal de Express habilitando **CORS** para peticiones de origen cruzado, **`body-parser`** para interpretar cuerpos en formato JSON, una ruta raíz (`GET /`) de verificación de estado y un middleware final que intercepta cualquier endpoint no definido devolviendo código HTTP `404`:
-
-```javascript
-import express from "express";
-import cors from "cors";
-import bodyParser from "body-parser";
-
-const app = express();
-
-app.use(cors());
-app.use(bodyParser.json());
-
-app.get("/", (req, res) => {
-  res.status(200).json({
-    message: "API REST de Productos - Proyecto Final Talento Tech",
-    status: "OK"
-  });
-});
-
-app.use((req, res) => {
-  res.status(404).json({
-    error: "Ruta no encontrada"
-  });
-});
-
-export default app;
-```
-
-### 3.3 Punto de entrada e inicio del servidor (`index.js`)
-
-Se importó `dotenv/config` para cargar las variables de entorno en memoria antes de levantar el servidor en el puerto asignado (`3000`):
-
-```javascript
-import "dotenv/config";
-import app from "./src/app.js";
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
-```
-
-### 3.4 Verificación de funcionamiento
-
-Se ejecutó el entorno de desarrollo mediante `npm run dev` y se validaron las respuestas en el navegador:
-
-* `GET http://localhost:3000/` $\rightarrow$ Estado `200 OK` con mensaje de bienvenida en formato JSON.
-* `GET http://localhost:3000/cualquier-cosa` $\rightarrow$ Estado `404 Not Found` con respuesta `{"error": "Ruta no encontrada"}`.
-
-
----
-
-## Fase 4: Módulo de Autenticación y Seguridad (JWT)
-
-Se implementó el flujo completo de autenticación demostrativa y autorización basada en **JSON Web Tokens (JWT)** para proteger las operaciones críticas de escritura de la API.
-
-### 4.1 Controlador de Autenticación (`src/controllers/auth.controller.js`)
-
-Se programó la validación de credenciales demostrativas (`user@email.com` / `strongPass123!`) y la generación de un token firmado mediante `jsonwebtoken` utilizando la clave secreta definida en `.env` con una vigencia de 1 hora:
-
-```javascript
-import jwt from "jsonwebtoken";
-
-const DEMO_USER = {
-  email: "user@email.com",
-  password: "strongPass123!"
-};
-
-export const login = (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({
-      error: "Debe proporcionar email y contraseña"
-    });
-  }
-
-  if (email !== DEMO_USER.email || password !== DEMO_USER.password) {
-    return res.status(401).json({
-      error: "Las credenciales no son correctas"
-    });
-  }
-
-  const token = jwt.sign(
-    { email: DEMO_USER.email },
-    process.env.JWT_SECRET,
-    { expiresIn: "1h" }
-  );
-
-  return res.status(200).json({ token });
-};
-```
-
-### 4.2 Enrutador de Autenticación (`src/routes/auth.router.js`)
-
-Se expuso el endpoint público `POST /login` integrado en `src/app.js` bajo el prefijo `/api/auth`:
-
-```javascript
-import { Router } from "express";
-import { login } from "../controllers/auth.controller.js";
-
-const router = Router();
-
-router.post("/login", login);
-
-export default router;
-```
-
-### 4.3 Middleware de Autorización (`src/middlewares/auth.middleware.js`)
-
-Se creó el filtro de seguridad que intercepta el encabezado `Authorization: Bearer <TOKEN>`, devolviendo estado `401` ante la ausencia de token y estado `403` si el token está adulterado o expirado:
-
-```javascript
-import jwt from "jsonwebtoken";
-
-export const auth = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({
-      error: "Token no proporcionado"
-    });
-  }
-
-  const token = authHeader.split(" ");
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(403).json({
-      error: "Token inválido o expirado"
-    });
-  }
-};
-```
-
-### 4.4 Verificación del Login
-
-Se validó el endpoint `POST http://localhost:3000/api/auth/login` mediante peticiones `curl`:
-
-* **Credenciales válidas:** Respuesta `200 OK` devolviendo el token JWT generado.
-* **Credenciales inválidas:** Respuesta `401 Unauthorized` devolviendo `{"error": "Las credenciales no son correctas"}`.
-
-
-
----
-
-## Fase 5: Conexión a la Base de Datos en la Nube (Firebase / Firestore)
-
-Se configuró el proyecto en Firebase Console con Cloud Firestore en modo de prueba y se estableció la conexión desde el backend mediante variables de entorno protegidas.
-
-### 5.1 Variables de entorno y plantilla (`.env` y `.env.example`)
-
-Se incorporaron las credenciales de configuración de la aplicación web de Firebase en el archivo local `.env` (excluido del repositorio mediante `.gitignore`) y se documentó su estructura en `.env.example`:
-
-```env
-FIREBASE_API_KEY=tu_firebase_api_key
-FIREBASE_AUTH_DOMAIN=tu_://firebaseapp.com
-FIREBASE_PROJECT_ID=tu_firebase_project_id
-FIREBASE_STORAGE_BUCKET=tu_proyecto.firebasestorage.app
-FIREBASE_MESSAGING_SENDER_ID=tu_messaging_sender_id
-FIREBASE_APP_ID=tu_firebase_app_id
-```
-
-### 5.2 Módulo de inicialización (`src/models/firebase.js`)
-
-Se creó el archivo encargado de inicializar la instancia de Firebase con las variables de entorno y exportar la referencia `db` de Cloud Firestore para su consumo en la capa de modelos:
-
-
-```javascript
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-export { db };
-```
-
-
----
-
-## Fase 6: Módulo Completo de Productos (CRUD y Protección JWT)
-
-Se desarrollaron las cuatro capas correspondientes al dominio de productos, integrando la persistencia en **Cloud Firestore**, las validaciones de negocio y la protección de rutas críticas mediante el middleware de autenticación **JWT**.
-
-### 6.1 Capa de Modelo (`src/models/products.model.js`)
-
-Se implementaron las operaciones directas contra la colección `products` de Firestore utilizando el SDK modular de Firebase (`getDocs`, `getDoc`, `addDoc`, `deleteDoc`):
-
-```javascript
-import { db } from "./firebase.js";
-import {
-  collection,
-  getDocs,
-  getDoc,
-  addDoc,
-  deleteDoc,
-  doc
-} from "firebase/firestore";
-
-const productsCollection = collection(db, "products");
-
-export const getAllProducts = async () => {
-  const snapshot = await getDocs(productsCollection);
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data()
-  }));
-};
-
-export const getProductById = async (id) => {
-  const productRef = doc(db, "products", id);
-  const snapshot = await getDoc(productRef);
-
-  if (!snapshot.exists()) {
-    return null;
-  }
-
-  return {
-    id: snapshot.id,
-    ...snapshot.data()
-  };
-};
-
-export const createProduct = async (productData) => {
-  const docRef = await addDoc(productsCollection, productData);
-  return {
-    id: docRef.id,
-    ...productData
-  };
-};
-
-export const deleteProduct = async (id) => {
-  const productRef = doc(db, "products", id);
-  const snapshot = await getDoc(productRef);
-
-  if (!snapshot.exists()) {
-    return false;
-  }
-
-  await deleteDoc(productRef);
-  return true;
-};
-```
-
-### 6.2 Capa de Servicio (`src/services/products.service.js`)
-
-Se centralizó la lógica de negocio y el saneamiento de datos (verificando presencia de nombre obligatorio y precio numérico mayor a cero) antes de delegar la persistencia al modelo.
-
-### 6.3 Capa de Controlador (`src/controllers/products.controller.js`)
-
-Se gestionaron las peticiones HTTP y los códigos de estado correspondientes (`200 OK`, `201 Created`, `400 Bad Request`, `404 Not Found` y `500 Internal Server Error`).
-
-### 6.4 Enrutamiento y Seguridad (`src/routes/products.router.js` y `src/app.js`)
-
-Se montaron los endpoints bajo el prefijo `/api/products`, dejando públicas las consultas y aplicando el middleware `auth` en las operaciones de creación y eliminación:
-
-* `GET /api/products` $\rightarrow$ Pública (lista todos los productos).
-* `GET /api/products/:id` $\rightarrow$ Pública (obtiene un producto por su ID).
-* `POST /api/products/create` $\rightarrow$ Protegida con Bearer Token (crea un nuevo producto en Firestore).
-* `DELETE /api/products/:id` $\rightarrow$ Protegida con Bearer Token (elimina un producto por su ID).
-
-### 6.5 Verificación Integral End-to-End
-
-Se validó mediante `curl` el ciclo completo del sistema: rechazo de creación sin token (`401`), generación de token válido en `/api/auth/login` (`200`), alta real en Firestore (`201`), consulta general y por ID (`200`) y baja definitiva (`200`).
+* **`GET /api/products`** *(Pública)*: Lista todos los productos almacenados en Cloud Firestore.
+* **`GET /api/products/:id`** *(Pública)*: Obtiene el detalle de un producto específico por su ID.
+* **`POST /api/products/create`** *(Protegida - Requiere Bearer Token)*: Crea un nuevo producto validando `name` (string obligatorio) y `price` (número mayor a 0).
+* **`DELETE /api/products/:id`** *(Protegida - Requiere Bearer Token)*: Elimina un producto existente de la base de datos.
